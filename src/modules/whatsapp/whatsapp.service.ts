@@ -61,11 +61,11 @@ class WhatsAppService extends EventEmitter {
 
   async initialize(): Promise<void> {
     if (this.destroyed) {
-      logger.warn("WhatsAppService: already destroyed — cannot re-initialize");
+      logger.warn("WhatsAppService: already destroyed - cannot re-initialize");
       return;
     }
 
-    logger.info("WhatsAppService: initializing client…");
+    logger.info("WhatsAppService: initializing client...");
     this.setStatus(WhatsAppStatus.INITIALIZING);
 
     // On every restart the same directory is reused → no new QR required.
@@ -140,7 +140,7 @@ class WhatsAppService extends EventEmitter {
         this.currentQR = dataUrl;
         this.setStatus(WhatsAppStatus.QR_READY);
         this.emit("qr", { qr: dataUrl });
-        logger.info("WhatsAppService: QR code generated — awaiting scan");
+        logger.info("WhatsAppService: QR code generated - awaiting scan");
       } catch (err) {
         logger.error({ err }, "WhatsAppService: QR generation failed");
       }
@@ -173,7 +173,7 @@ class WhatsAppService extends EventEmitter {
 
     // Client Ready
     this.client.on("ready", () => {
-      logger.info("WhatsAppService: client ready ✓");
+      logger.info("WhatsAppService: client ready to send messages");
       this.reconnectAttempts = 0;
       this.currentQR = null;
       this.setStatus(WhatsAppStatus.READY);

@@ -101,7 +101,6 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
       var socket = io({ transports: ["websocket", "polling"] });
-
       var dot = document.getElementById("dot");
       var sockLabel = document.getElementById("socketLabel");
       var pill = document.getElementById("pill");
@@ -170,11 +169,17 @@
       socket.on("connect", function () {
         dot.classList.add("on");
         sockLabel.textContent = "Live";
+        setStatus("warn", "Connecting", "Establishing socket connection…");
       });
 
       socket.on("disconnect", function () {
         dot.classList.remove("on");
         sockLabel.textContent = "Disconnected";
+        setStatus(
+          "warn",
+          "Disconnected",
+          "Socket connection lost — attempting to reconnect…",
+        );
       });
 
       socket.on("whatsapp:status", function (data) {
