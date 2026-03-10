@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhatsApp Gateway — BrightFutureSoft</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="header">
+      <a
+        href="https://brightfuturesoft.com"
+        target="_blank"
+        rel="noopener"
+        class="logo"
+      >
+        <div class="logo-icon">✦</div>
+        <div>
+          <div class="logo-name">BrightFutureSoft</div>
+          <div class="logo-sub">WhatsApp Gateway</div>
+        </div>
+      </a>
+      <div class="socket-badge">
+        <div class="dot" id="dot"></div>
+        <span id="socketLabel">Connecting…</span>
+      </div>
+    </header>
+
+    <main>
+      <div class="status-pill" id="pill">
+        <div class="dot" id="pillDot"></div>
+        <span id="pillText">Initializing</span>
+      </div>
+      <p class="status-desc" id="statusDesc">Starting WhatsApp client…</p>
+
+      <div class="qr-card">
+        <div id="qrWrap" class="qr-wrap" style="display: none">
+          <img id="qrImg" src="" alt="WhatsApp QR Code" />
+        </div>
+
+        <div
+          id="qrSpinner"
+          style="
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 240px;
+            height: 240px;
+            justify-content: center;
+          "
+        >
+          <div class="spinner"></div>
+          <span style="font-size: 13px; color: #64748b">Loading…</span>
+        </div>
+
+        <div id="qrConnected" class="qr-connected" style="display: none">
+          <div class="check">✓</div>
+          <p>WhatsApp Connected</p>
+          <small>Ready to send and receive messages</small>
+        </div>
+
+        <div id="qrPlaceholder" class="qr-placeholder">
+          <svg
+            width="64"
+            height="64"
+            viewBox="0 0 64 64"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="4" y="4" width="22" height="22" rx="2" />
+            <rect x="10" y="10" width="10" height="10" />
+            <rect x="38" y="4" width="22" height="22" rx="2" />
+            <rect x="44" y="10" width="10" height="10" />
+            <rect x="4" y="38" width="22" height="22" rx="2" />
+            <rect x="10" y="44" width="10" height="10" />
+            <rect x="38" y="38" width="8" height="8" />
+            <rect x="52" y="38" width="8" height="8" />
+            <rect x="38" y="52" width="8" height="8" />
+            <rect x="52" y="52" width="8" height="8" />
+          </svg>
+          <span>Waiting for QR code…</span>
+        </div>
+
+        <div id="qrHint" class="qr-hint" style="display: none">
+          <strong>Scan with WhatsApp</strong>
+          Settings → Linked Devices → Link a Device
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      ©
+      <a href="https://brightfuturesoft.com" target="_blank" rel="noopener"
+        >BrightFutureSoft</a
+      >
+      &nbsp;·&nbsp; WhatsApp Web API Gateway
+    </footer>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      var socket = io({ transports: ["websocket", "polling"] });
+
+      var dot = document.getElementById("dot");
+      var sockLabel = document.getElementById("socketLabel");
+      var pill = document.getElementById("pill");
+      var pillText = document.getElementById("pillText");
+      var statusDesc = document.getElementById("statusDesc");
+      var qrWrap = document.getElementById("qrWrap");
+      var qrImg = document.getElementById("qrImg");
+      var qrSpinner = document.getElementById("qrSpinner");
+      var qrConnected = document.getElementById("qrConnected");
+      var qrPlaceholder = document.getElementById("qrPlaceholder");
+      var qrHint = document.getElementById("qrHint");
+
+      function showOnly(id) {
+        qrWrap.style.display = "none";
+        qrSpinner.style.display = "none";
+        qrConnected.style.display = "none";
+        qrPlaceholder.style.display = "none";
+        qrHint.style.display = "none";
+        if (id === "qrWrap") {
+          qrWrap.style.display = "flex";
+          qrHint.style.display = "block";
+        } else if (id === "spinner") {
+          qrSpinner.style.display = "flex";
+        } else if (id === "connected") {
+          qrConnected.style.display = "flex";
+        } else {
+          qrPlaceholder.style.display = "flex";
+        }
+      }
+
+      function setStatus(cls, text, desc) {
+        pill.className = "status-pill " + cls;
+        pillText.textContent = text;
+        statusDesc.textContent = desc;
+      }
+
+      function applyStatus(s) {
+        s = (s || "").toUpperCase();
+        if (s === "READY") {
+          showOnly("connected");
+          setStatus("ready", "Connected", "WhatsApp is active and ready");
+        } else if (s === "QR_READY") {
+          setStatus(
+            "qr",
+            "Scan QR Code",
+            "Open WhatsApp → Linked Devices → Link a Device",
+          );
+        } else if (s === "AUTHENTICATED") {
+          showOnly("spinner");
+          setStatus("auth", "Authenticated", "Loading WhatsApp session…");
+        } else if (s === "RECONNECTING") {
+          showOnly("spinner");
+          setStatus("warn", "Reconnecting", "Trying to reconnect…");
+        } else if (s === "DISCONNECTED") {
+          showOnly("placeholder");
+          setStatus("warn", "Disconnected", "WhatsApp connection lost");
+        } else if (s === "FAILED") {
+          showOnly("placeholder");
+          setStatus("err", "Failed", "Authentication failed");
+        } else {
+          showOnly("placeholder");
+          setStatus("", "Initializing", "Starting WhatsApp client…");
+        }
+      }
+
+      socket.on("connect", function () {
+        dot.classList.add("on");
+        sockLabel.textContent = "Live";
+      });
+
+      socket.on("disconnect", function () {
+        dot.classList.remove("on");
+        sockLabel.textContent = "Disconnected";
+      });
+
+      socket.on("whatsapp:status", function (data) {
+        applyStatus(data.status);
+      });
+
+      socket.on("whatsapp:qr", function (data) {
+        qrImg.src = data.qr;
+        showOnly("qrWrap");
+        setStatus(
+          "qr",
+          "Scan QR Code",
+          "Open WhatsApp → Linked Devices → Link a Device",
+        );
+      });
+
+      socket.on("whatsapp:authenticated", function () {
+        showOnly("spinner");
+        setStatus("auth", "Authenticated", "Loading WhatsApp session…");
+      });
+
+      socket.on("whatsapp:ready", function () {
+        showOnly("connected");
+        setStatus("ready", "Connected", "WhatsApp is active and ready");
+      });
+
+      socket.on("whatsapp:loading", function (data) {
+        showOnly("spinner");
+        setStatus(
+          "auth",
+          "Loading…",
+          (data.message || "Loading") + " " + Math.round(data.percent) + "%",
+        );
+      });
+
+      socket.on("whatsapp:disconnected", function (data) {
+        showOnly("placeholder");
+        setStatus(
+          "warn",
+          "Disconnected",
+          "Disconnected: " + ((data && data.reason) || "unknown"),
+        );
+      });
+
+      socket.on("whatsapp:auth_failure", function () {
+        showOnly("placeholder");
+        setStatus(
+          "err",
+          "Auth Failed",
+          "Authentication failed — new QR incoming…",
+        );
+      });
+    </script>
+  </body>
+</html>
