@@ -2,8 +2,6 @@ import Redis from "ioredis";
 import { config } from "./index";
 import { logger } from "../utils/logger";
 
-// ─── ioredis singleton
-
 let redisClient: Redis | null = null;
 
 export function getRedisClient(): Redis {

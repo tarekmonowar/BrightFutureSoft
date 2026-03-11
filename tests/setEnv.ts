@@ -1,0 +1,9 @@
+process.env.NODE_ENV = "test";
+process.env.PORT = "3000";
+process.env.REDIS_URL = "redis://localhost:6379";
+process.env.API_KEY = "test-api-key-12345";
+process.env.LOG_LEVEL = "info";
+process.env.WHATSAPP_CLIENT_ID = "test-client";
+process.env.RATE_LIMIT_WINDOW_MS = "900000";
+process.env.RATE_LIMIT_MAX = "100";
+process.env.MESSAGE_QUEUE_CONCURRENCY = "5";

@@ -16,24 +16,20 @@ async function bootstrap(): Promise<void> {
 
   const httpServer = http.createServer(app);
 
-  // run Socket.IO
   createSocketServer(httpServer);
   logger.info("Socket.IO server attached");
 
-  // BullMQ worker
   startMessageWorker();
   logger.info("Message worker started");
 
   await new Promise<void>((resolve) => {
     httpServer.listen(config.PORT, () => resolve());
   });
-
   logger.info(
     { port: config.PORT, env: config.NODE_ENV },
     `Server listening on http://localhost:${config.PORT}`,
   );
 
-  // Initialise the WhatsApp client
   await whatsappService.initialize();
 
   // ── Graceful shutdown ──────
@@ -41,7 +37,6 @@ async function bootstrap(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, "Shutdown signal received — draining…");
 
-    // Stop accepting new HTTP connections
     httpServer.close(async () => {
       logger.info("HTTP server closed");
     });
@@ -59,7 +54,7 @@ async function bootstrap(): Promise<void> {
     }
   };
 
-  // Force-kill if cleanup takes longer than 30 s
+  // Force-kill
   const forceExit = (): void => {
     logger.error("Shutdown timeout exceeded — forcing exit");
     process.exit(1);

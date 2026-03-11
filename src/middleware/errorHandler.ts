@@ -3,7 +3,7 @@ import { AppError, ValidationError } from "../utils/errors";
 import { logger } from "../utils/logger";
 import { config } from "../config";
 
-// ─── Response shape ───
+//  Response shape
 interface ErrorBody {
   success: false;
   error: string;
@@ -11,7 +11,7 @@ interface ErrorBody {
   stack?: string;
 }
 
-// ─── 404 catch-all ───────
+//  404 catch-all
 export function notFoundHandler(
   req: Request,
   res: Response,
@@ -23,12 +23,11 @@ export function notFoundHandler(
   } satisfies ErrorBody);
 }
 
-// ─── Centralised error handler
+//  Centralised error handler
 export function errorHandler(
   err: unknown,
   req: Request,
   res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
 ): void {
   const isDev = config.NODE_ENV !== "production";

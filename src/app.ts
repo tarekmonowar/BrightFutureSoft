@@ -12,7 +12,6 @@ import path from "path";
 export function createApp(): Application {
   const app = express();
 
-  // ── Security headers ──────
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -27,26 +26,21 @@ export function createApp(): Application {
 
   app.use(
     cors({
-      // In production restrict to declared origins; open in dev for convenience
       origin: config.NODE_ENV === "production" ? false : "*",
       methods: ["GET", "POST"],
       allowedHeaders: ["Content-Type", "X-API-Key"],
     }),
   );
 
-  // Serve  static files
   app.use(express.static(path.join(__dirname, "../public")));
-
-  // ── Trust first proxy (needed for accurate IP in rate-limiters)
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "16kb" }));
   app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
-  // ── HTTP request logging (Pino) ───────────────────────────────────────────
+  // ── HTTP request logging (Pino)
   app.use(
     pinoHttp({
       logger,
-      // Suppress /health polling noise in production
       autoLogging: {
         ignore: (req) =>
           config.NODE_ENV === "production" && req.url === "/health",
@@ -59,16 +53,10 @@ export function createApp(): Application {
     }),
   );
 
-  // ── Global rate limiter
+  // ── Global
   app.use(globalRateLimiter);
-
-  // ── Application routes
   app.use(routes);
-
-  // ── 404 handler
   app.use(notFoundHandler);
-
-  // ── Centralised error handler
   app.use(errorHandler);
 
   return app;

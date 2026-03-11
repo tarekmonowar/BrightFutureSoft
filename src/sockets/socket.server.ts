@@ -5,8 +5,6 @@ import { logger } from "../utils/logger";
 import { SOCKET_EVENTS } from "./events";
 import { whatsappService } from "../modules/whatsapp/whatsapp.service";
 
-// ─── Socket.IO server
-
 let io: Server | null = null;
 
 export function createSocketServer(httpServer: HttpServer): Server {
@@ -19,8 +17,6 @@ export function createSocketServer(httpServer: HttpServer): Server {
     pingInterval: 25_000,
     pingTimeout: 60_000,
   });
-
-  // ── Per-connection handler
 
   io.on("connection", (socket) => {
     const ip = socket.handshake.address;

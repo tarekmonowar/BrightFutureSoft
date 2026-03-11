@@ -28,3 +28,7 @@ Thumbs.db
 
 # Puppeteer / Chromium cache
 .cache/
+
+# Test coverage
+coverage/
+coverage/lcov.info

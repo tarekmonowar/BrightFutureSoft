@@ -2,8 +2,6 @@ import type { Request, Response, NextFunction } from "express";
 import { type ZodSchema, ZodError } from "zod";
 import { ValidationError } from "../utils/errors";
 
-// ─── Zod request-body validation
-
 export function validateBody<T>(schema: ZodSchema<T>) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.body);
@@ -20,7 +18,6 @@ export function validateBody<T>(schema: ZodSchema<T>) {
       return next(new ValidationError("Validation failed", fieldErrors));
     }
 
-    // Replace raw body with the parsed + coerced value
     req.body = result.data;
     next();
   };

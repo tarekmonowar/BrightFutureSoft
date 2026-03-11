@@ -1,5 +1,3 @@
-// ─── Socket.IO event names ─────────
-
 export const SOCKET_EVENTS = {
   QR: "whatsapp:qr",
   READY: "whatsapp:ready",
