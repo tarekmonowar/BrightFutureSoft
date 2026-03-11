@@ -13,8 +13,8 @@
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
     "test": "jest --config jest.config.ts --forceExit --detectOpenHandles",
-    "test:unit": "jest --config jest.config.ts --testPathPattern=tests/unit --forceExit",
-    "test:integration": "jest --config jest.config.ts --testPathPattern=tests/integration --forceExit",
+    "test:unit": "jest --config jest.config.ts --testPathPatterns=tests/unit --forceExit",
+    "test:integration": "jest --config jest.config.ts --testPathPatterns=tests/integration --forceExit",
     "test:coverage": "jest --config jest.config.ts --coverage --forceExit --detectOpenHandles",
     "test:watch": "jest --config jest.config.ts --watchAll"
   },
