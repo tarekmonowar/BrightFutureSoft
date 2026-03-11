@@ -2,9 +2,9 @@ name: Node CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
 
 jobs:
   test:
@@ -14,7 +14,9 @@ jobs:
         image: redis
         ports:
           - 6379:6379
-        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+        options:
+          --health-cmd "redis-cli ping" --health-interval 10s --health-timeout
+          5s --health-retries 5
     env:
       NODE_ENV: test
       API_KEY: test-api-key
@@ -23,9 +25,9 @@ jobs:
       REDIS_URL: redis://localhost:6379
       WHATSAPP_CLIENT_ID: test-client
       LOG_LEVEL: info
-      RATE_LIMIT_WINDOW_MS: '900000'
-      RATE_LIMIT_MAX: '100'
-      MESSAGE_QUEUE_CONCURRENCY: '1'
+      RATE_LIMIT_WINDOW_MS: "900000"
+      RATE_LIMIT_MAX: "100"
+      MESSAGE_QUEUE_CONCURRENCY: "1"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
