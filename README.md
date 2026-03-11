@@ -1,3 +1,170 @@
+# WhatsApp API Backend
+
+A compact, production-oriented REST + real-time backend that provides a safe
+HTTP API for sending messages via a WhatsApp Web client. The project focuses on
+reliable delivery by queuing outgoing messages (BullMQ + Redis), processing them
+with a background worker, and exposing status and control points for clients
+through HTTP and Socket.IO.
+
+**Problems this project solves**
+
+- Provides a simple REST API to enqueue messages for delivery through WhatsApp
+  Web, decoupling web requests from delivery and improving reliability under
+  load.
+- Persists WhatsApp session state locally so the service can recover after
+  restarts without re-authenticating every time.
+- Emits real-time events (QR code, status changes) to lightweight clients so
+  operator UIs can display authentication state and onboarding instructions.
+- Protects the API with a simple API key and per-endpoint rate limiting to
+  reduce abuse and accidental overload.
+
+**Technology & why used**
+
+- **Node.js + Express**: minimal, well-supported web framework for building REST
+  APIs.
+- **whatsapp-web.js (LocalAuth)**: drives a headless WhatsApp Web client and
+  persists credentials locally. LocalAuth keeps sessions across restarts without
+  external identity providers — practical for small deployments and automated
+  workers.
+- **BullMQ + Redis**: reliable job queue for background processing. Using a
+  queue decouples HTTP requests from the actual send operation, enables
+  retries/backoff, and makes throughput control easy via worker concurrency.
+- **Worker process (BullMQ Worker)**: processes queued send jobs concurrently
+  and isolates delivery logic from request handling.
+- **express-rate-limit**: per-route rate limiter (plus a global limiter) to
+  prevent abuse and protect downstream systems (WhatsApp client, Redis).
+- **Socket.IO**: broadcasts WhatsApp client events (QR, ready, authenticated,
+  disconnected) so UI clients can react in real time (scan QR, show status).
+- **Local API Key**: simple `X-API-Key` header authentication for protected
+  endpoints. This keeps the API simple to integrate with scripts and internal
+  tools; swap to OAuth or JWT if you need multi-tenant or user-scoped auth.
+
+# How to clone & run
+
+1. Clone and install:
+
+```bash
+git clone https://github.com/tarekmonowar/BrightFutureSoft.git
+cd BrightFutureSoft
+npm ci
+```
+
+2. Copy the provided `.env` or create one from the environment schema. There is
+   a working example in `.env` used for local/dev runs.
+
+3. Run in development (auto-reload):
+
+```bash
+npm run dev
+```
+
+4. Build and run production:
+
+```bash
+npm run build
+npm start
+```
+
+**Important environment variables** The application validates environment
+variables at startup.
+
+- **PORT** — HTTP port (default: `3000`).
+- **NODE_ENV** — environment (`development|production|test`).
+- **REDIS_URL** — Redis connection URL (used by BullMQ and ioredis).
+- **API_KEY** — API key string required for protected endpoints (`X-API-Key`).
+- **LOG_LEVEL** — pino log level (`info`, `debug`, ...).
+- **RATE_LIMIT_WINDOW_MS** — rate-limit window in ms.
+- **RATE_LIMIT_MAX** — allowed requests per `RATE_LIMIT_WINDOW_MS`.
+- **WHATSAPP_CLIENT_ID** — client id used by `whatsapp-web.js` `LocalAuth`.
+- **MESSAGE_QUEUE_CONCURRENCY** — worker concurrency for message processing.
+
+Example (local `.env`):
+
+```
+PORT=5000
+NODE_ENV=development
+API_KEY=your-api-key-here
+REDIS_URL=redis://localhost:6379
+LOG_LEVEL=info
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=100
+WHATSAPP_CLIENT_ID=my-whatsapp-session
+MESSAGE_QUEUE_CONCURRENCY=5
+
+```
+
+**HTTP API Endpoints** All endpoints are relative to the server base URL (e.g.
+`http://localhost:5000`).
+
+- **GET /health** — application health
+  - Headers: none
+  - Request body: none
+  - Response 200 JSON (HealthResponse): { "status": "ok", "uptime": 123, //
+    seconds "timestamp": "...", "version": "1.0.0" }
+
+- **GET /api/v1/whatsapp/status** — WhatsApp client status
+  - Headers: none
+  - Request body: none
+  - Response 200 JSON: { "success": true, "data": { "status":
+    "INITIALIZING|QR_READY|AUTHENTICATED|READY|...", "timestamp": "...", // If
+    WhatsApp has generated a QR, the `qr` field contains a // data-URL string
+    that can be displayed by a browser "qr": "data:image/png;base64,..." //
+    optional } }
+
+- **POST /api/v1/whatsapp/send-message** — enqueue a message to send
+  - Headers:
+    - `Content-Type: application/json`
+    - `X-API-Key: <API_KEY>` — required (simple local auth)
+  - Body (JSON): { "to": "447700900123", // phone number without @c.us
+    "message": "Hello world" }
+  - Behaviour: validates body, checks WhatsApp client is READY, enqueues a job
+    to BullMQ and returns 202 if accepted.
+  - Success response 202 JSON (SendMessageResponse): { "success": true, "jobId":
+    "<uuid>", "message": "Message accepted and queued for delivery" }
+  - Rate limiting: this endpoint uses a stricter rate limiter. If the limit is
+    exceeded the response is 429 with JSON
+    `{ success: false, error: "Too many requests..." }`.
+
+Notes: the send endpoint only enqueues messages — actual delivery is handled by
+the background worker. Check job completion in logs; extend with a job
+completion webhook or status endpoint if you need delivery callbacks.
+
+**Socket.IO events (real-time client integration)**
+
+- Connect a Socket.IO client to the same server to receive WhatsApp events.
+- Events broadcast from server (see
+  [src/sockets/events.ts](src/sockets/events.ts)):
+  - `whatsapp:status` — initial connection status
+  - `whatsapp:qr` — QR code payload `{ qr: string }` (data-URL)
+  - `whatsapp:ready` — client ready
+  - `whatsapp:authenticated` — authenticated
+  - `whatsapp:disconnected` — `{ reason }`
+  - `whatsapp:loading` — loading progress `{ percent, message }`
+  - `whatsapp:auth_failure` — `{ message }`
+
+Example (browser client):
+
+```js
+import { io } from "socket.io-client";
+const socket = io("http://localhost:5000");
+socket.on("whatsapp:qr", ({ qr }) => {
+  /* show QR image */
+});
+socket.on("whatsapp:ready", () => {
+  /* update UI */
+});
+```
+
+**How the queue & worker operate**
+
+- Queue name: `whatsapp:messages` (see
+  [src/modules/message/message.queue.ts](src/modules/message/message.queue.ts)).
+- Producer: `enqueueMessage()` creates a job with `jobId = UUID` and returns
+  immediately with `202 Accepted`.
+- Worker: [src/modules/message/message.worker.ts] processes jobs and calls the
+  WhatsApp service `sendMessage(to, text)`; concurrency and small per-worker
+  limits are configured via environment variables.
+
 # Testing — WhatsApp API Backend
 
 This project includes a centralized test suite (Jest + ts-jest + Supertest) with
@@ -81,65 +248,31 @@ npm run test:coverage
 # Coverage output written to the coverage/ directory
 ```
 
-Debugging failing tests
+**Client setup notes**
 
-- Re-run the failing test file directly (see "Run a single test file").
-- Use --runInBand to run tests serially when investigating ordering/resource
-  issues:
+- To onboard a human operator: visit the UI that connects to the Socket.IO
+  server, display the `whatsapp:qr` data-URL as an image, and ask the operator
+  to scan it with their phone. Once scanned the service will emit
+  `whatsapp:ready`.
+- `LocalAuth` stores WhatsApp session data under `./.wwebjs_auth` by default —
+  keep that directory persistent across restarts.
 
-```bash
-npx jest --runInBand tests/unit/message.service.test.ts
-```
+**Where to look in the code**
 
-- In VS Code you can run/debug individual tests from the editor test gutter (if
-  using the Jest or Node test runner extensions).
+- Server bootstrap: [src/server.ts](src/server.ts)
+- App setup & middleware: [src/app.ts](src/app.ts)
+- REST routes: [src/routes/index.ts](src/routes/index.ts)
+- WhatsApp client:
+  [src/modules/whatsapp/whatsapp.service.ts](src/modules/whatsapp/whatsapp.service.ts)
+- Queue/Worker:
+  [src/modules/message/message.queue.ts](src/modules/message/message.queue.ts)
+  and
+  [src/modules/message/message.worker.ts](src/modules/message/message.worker.ts)
 
-What the client needs to know to validate locally
+Thank you for checking out this project! I hope it serves as a useful starting
+point for anyone looking to build a WhatsApp Web API backend with Node.js.
+Please feel free to contact me with any questions or feedback.
 
-1. Clone the repo and install deps:
+# Tarek Monowar
 
-```bash
-git clone <repo>
-cd BrightSoft
-npm ci
-```
-
-2. Run the full test suite:
-
-```bash
-npm test
-```
-
-3. If a developer or QA needs to re-run only a subset, use:
-
-- Unit tests: npm run test:unit
-- Integration tests: npm run test:integration
-- One file: npm test -- tests/integration/whatsapp.sendMessage.test.ts
-- One test by name: npm test -- -t "Authentication (X-API-Key)"
-
-Notes about environment / mocks
-
-- Tests do not require running Redis, BullMQ, or a real WhatsApp client. Those
-  modules are mocked in tests/preSetup.ts and tests/setup.ts.
-- tests/setEnv.ts provides test-specific environment variables so test runs are
-  deterministic.
-- To add tests:
-  - Put unit-level tests in tests/unit and use .test.ts suffix
-  - Put integration tests in tests/integration
-  - Add shared mocks in tests/mocks or extend tests/setup.ts and preSetup.ts
-
-If anything fails on the client machine
-
-- Ensure Node version >= 18
-- Run npm ci to ensure devDependencies (jest, ts-jest, supertest, @types) are
-  installed
-- Run the failing test directly to see detailed output:
-
-```bash
-npx jest --config jest.config.ts tests/path/to/file.test.ts -t "exact test name"
-```
-
-Contact
-
-- Provide the failing test name, test file path, and the printed Jest output
-  when asking for help. This accelerates reproduction and fixes.
+Full-stack developer
