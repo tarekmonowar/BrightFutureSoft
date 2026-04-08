@@ -1,3 +1,6 @@
+/// <reference types="jest" />
+/// <reference types="node" />
+
 // ── Mock ioredis
 jest.mock("ioredis", () => {
   return jest.fn().mockImplementation(() => ({
