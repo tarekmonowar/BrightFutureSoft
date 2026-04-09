@@ -41,6 +41,8 @@ export async function sendMessage(
   try {
     const { to, message } = req.body as SendMessageRequest;
 
+    const numberArray = to.split("@");
+
     // Guard — reject if WhatsApp is not in READY state
     const currentStatus = whatsappService.getStatus();
     if (currentStatus !== WhatsAppStatus.READY) {
