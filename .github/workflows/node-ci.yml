@@ -37,6 +37,9 @@ jobs:
         with:
           node-version: 18
 
+      - name: check node version
+        run: node -v
+
       - name: Install dependencies
         run: npm ci
 
